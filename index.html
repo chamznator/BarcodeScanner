@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Barcode Scanner Web App</title>
+    <script src="https://cdn.rawgit.com/serratus/quaggaJS/master/dist/quagga.min.js"></script>
+</head>
+<body>
+    <h1>Barcode Scanner</h1>
+    <p>Click the button to start scanning barcodes:</p>
+    <button id="scanButton">Scan Barcode</button>
+    <div id="result"></div>
+    <video id="video" style="display: none;"></video>
+    <div id="bounding-box"></div>
+
+    <style>
+        #bounding-box {
+            position: absolute;
+            border: 2px solid red;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+    </style>
+
+    <script>
+        const scanButton = document.getElementById('scanButton');
+        const result = document.getElementById('result');
+        const video = document.getElementById('video');
+        const boundingBox = document.getElementById('bounding-box');
+        let stream;
+
+        async function startScanning() {
+            try {
+                if (!stream) {
+                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    video.style.display = 'block';
+                    video.srcObject = stream;
+                }
+
+                video.play();
+
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: video
+                    },
+                    decoder: {
+                        readers: ["code_128_reader", "ean_reader"]
+                    }
+                }, function (err) {
+                    if (err) {
+                        console.error('Quagga initialization failed: ', err);
+                        result.innerHTML = 'Barcode scanner initialization failed.';
+                        return;
+                    }
+                    Quagga.start();
+
+                    Quagga.onDetected(data => {
+                        const code = data.codeResult.code;
+                        result.innerHTML = `Scanned barcode: ${code}`;
+                        drawBoundingBox(data.codeResult);
+                        Quagga.stop();
+                    });
+                });
+            } catch (error) {
+                console.error('Camera access error:', error);
+                result.innerHTML = 'Failed to access the camera. Please check your camera permissions.';
+            }
+        }
+
+        function drawBoundingBox(result) {
+            if (result && result.location) {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                canvas.style.position = 'absolute';
+                canvas.style.top = '0';
+                canvas.style.left = '0';
+                canvas.style.pointerEvents = 'none';
+
+                const x = result.location.topLeftCorner.x;
+                const y = result.location.topLeftCorner.y;
+                const width = result.location.bottomRightCorner.x - x;
+                const height = result.location.bottomRightCorner.y - y;
+
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, width, height);
+
+                boundingBox.appendChild(canvas);
+            }
+        }
+
+        scanButton.addEventListener('click', startScanning);
+
+        // Ensure the camera stream is released when the user closes the app
+        window.addEventListener('beforeunload', () => {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        });
+    </script>
+</body>
+</html>
