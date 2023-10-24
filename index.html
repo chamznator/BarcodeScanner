@@ -6,7 +6,8 @@
 </head>
 <body>
     <h1>Barcode Scanner</h1>
-    <p>Click the button to start scanning barcodes:</p>
+    <p>Select a camera and click the button to start scanning barcodes:</p>
+    <select id="cameraSelector"></select>
     <button id="scanButton">Scan Barcode</button>
     <div id="result"></div>
     <video id="video" style="display: none;"></video>
@@ -26,12 +27,15 @@
         const result = document.getElementById('result');
         const video = document.getElementById('video');
         const boundingBox = document.getElementById('bounding-box');
+        const cameraSelector = document.getElementById('cameraSelector');
         let stream;
 
         async function startScanning() {
+            const selectedDeviceId = cameraSelector.value;
+
             try {
                 if (!stream) {
-                    stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                    stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: selectedDeviceId } });
                     video.style.display = 'block';
                     video.srcObject = stream;
                 }
@@ -92,6 +96,19 @@
                 boundingBox.appendChild(canvas);
             }
         }
+
+        // Populate the camera selection dropdown
+        navigator.mediaDevices.enumerateDevices()
+            .then(devices => {
+                devices.forEach(device => {
+                    if (device.kind === 'videoinput') {
+                        const option = document.createElement('option');
+                        option.value = device.deviceId;
+                        option.text = device.label || `Camera ${cameraSelector.options.length + 1}`;
+                        cameraSelector.appendChild(option);
+                    }
+                });
+            });
 
         scanButton.addEventListener('click', startScanning);
 
